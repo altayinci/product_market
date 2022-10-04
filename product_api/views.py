@@ -56,22 +56,22 @@ class ProductViewSet(viewsets.ModelViewSet):
         body_dict = json.loads(body.decode('utf-8'))
 
         try:
-            product_obj = Product.objects.create(name=body_dict.get('name'),
-                                                 price=body_dict.get('price'),
-                                                 description=body_dict.get('description'),
-                                                 currency=body_dict.get('currency'),
-                                                 seller_id=body_dict.get('seller_id'),
-                                                 in_stock=body_dict.get('in_stock'))
-            product_obj.save()
-
-            delivery_options = body_dict.get("delivery_options")
-            for option in delivery_options:
-                delivery_options_obj = DeliveryOptions(name=option.get('name'),
-                                                       price=option.get('price'),
-                                                       currency=option.get('currency'),
-                                                       product=product_obj,
-                                                       )
-                delivery_options_obj.save()
+            with transaction.atomic():
+                product_obj = Product.objects.create(name=body_dict.get('name'),
+                                                     price=body_dict.get('price'),
+                                                     description=body_dict.get('description'),
+                                                     currency=body_dict.get('currency'),
+                                                     seller_id=body_dict.get('seller_id'),
+                                                     in_stock=body_dict.get('in_stock'))
+                product_obj.save()
+                delivery_options = body_dict.get("delivery_options")
+                for option in delivery_options:
+                    delivery_options_obj = DeliveryOptions(name=option.get('name'),
+                                                           price=option.get('price'),
+                                                           currency=option.get('currency'),
+                                                           product=product_obj,
+                                                           )
+                    delivery_options_obj.save()
 
         except Exception as e:
             content = {'Error': str(e)}
@@ -89,27 +89,38 @@ class ProductViewSet(viewsets.ModelViewSet):
         except Product.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
-        if body_dict.get('delivery_options'):
-            product_obj.delivery_options.all().delete()
-            for option in body_dict.get('delivery_options'):
-                delivery_options_obj = DeliveryOptions.objects.create(name=option.get('name'),
-                                                                      price=option.get('price'),
-                                                                      currency=option.get('currency'),
-                                                                      product=product_obj
-                                                                      )
-                delivery_options_obj.save()
+        try:
+            with transaction.atomic():
+                if body_dict.get('delivery_options'):
+                    product_obj.delivery_options.all().delete()
+                    for option in body_dict.get('delivery_options'):
+                        delivery_options_obj = DeliveryOptions.objects.create(name=option.get('name'),
+                                                                              price=option.get('price'),
+                                                                              currency=option.get('currency'),
+                                                                              product=product_obj
+                                                                              )
+                        delivery_options_obj.save()
 
-        product_obj.name = body_dict.get('name') if body_dict.get('name') else product_obj.name
-        product_obj.price = body_dict.get('price') if body_dict.get('price') else product_obj.price
-        product_obj.description = body_dict.get('description') if body_dict.get('description') else product_obj.description
-        product_obj.currency = body_dict.get('currency') if body_dict.get('currency') else product_obj.currency
-        product_obj.seller_id = body_dict.get('seller_id') if body_dict.get('seller_id') else product_obj.seller_id
-        product_obj.in_stock = body_dict.get('in_stock') if body_dict.get('in_stock') else product_obj.in_stock
+                product_obj.name = body_dict.get('name') if body_dict.get('name') else product_obj.name
+                product_obj.price = body_dict.get('price') if body_dict.get('price') else product_obj.price
+                product_obj.description = body_dict.get('description') if body_dict.get('description') else product_obj.description
+                product_obj.currency = body_dict.get('currency') if body_dict.get('currency') else product_obj.currency
+                product_obj.seller_id = body_dict.get('seller_id') if body_dict.get('seller_id') else product_obj.seller_id
+                product_obj.in_stock = body_dict.get('in_stock') if body_dict.get('in_stock') else product_obj.in_stock
 
-        product_obj.save()
+                product_obj.save()
+        except Exception as e:
+            content = {'Error': str(e)}
+            return Response(content, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response(status=status.HTTP_200_OK)
 
     @transaction.atomic
     def destroy(self, request, pk=None):
-        return super(ProductViewSet, self).destroy(request, pk=None)
+        try:
+            with transaction.atomic():
+                response = super(ProductViewSet, self).destroy(request, pk=None)
+        except Exception as e:
+            content = {'Error': str(e)}
+            return Response(content, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return response
